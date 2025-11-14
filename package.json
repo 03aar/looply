@@ -16,7 +16,7 @@
     "@dnd-kit/sortable": "^9.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^3.9.1",
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^5.0.0",
     "@tanstack/react-query": "^5.59.20",
     "autoprefixer": "^10.4.22",
     "class-variance-authority": "^0.7.1",
@@ -39,6 +39,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@prisma/engines-version": "^6.20.0-5.46b83975fec203f6665832b932ab3dc58be23eab",
     "@types/node": "^22",
     "@types/papaparse": "^5.3.15",
     "@types/react": "^18",
@@ -47,7 +48,7 @@
     "eslint": "^8",
     "eslint-config-next": "^14.2.15",
     "postcss": "^8",
-    "prisma": "^5.22.0",
+    "prisma": "^5.0.0",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7"
   }
