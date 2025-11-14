@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  forms         Form[]
+}
+
+model Form {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fields      FormField[]
+  responses   FormResponse[]
+  settings    FormSettings?
+  isPublished Boolean     @default(false)
+  shareId     String      @unique @default(cuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([shareId])
+}
+
+model FormSettings {
+  id                    String   @id @default(cuid())
+  formId                String   @unique
+  form                  Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  allowMultipleSubmissions Boolean @default(true)
+  requireLogin          Boolean  @default(false)
+  showProgressBar       Boolean  @default(true)
+  customTheme           Json?    // Store custom colors, fonts, etc.
+  confirmationMessage   String?
+  redirectUrl           String?
+  collectEmail          Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model FormField {
+  id          String   @id @default(cuid())
+  formId      String
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  type        FieldType
+  label       String
+  description String?
+  placeholder String?
+  required    Boolean  @default(false)
+  order       Int
+  options     Json?    // For multiple choice, checkboxes, dropdown options
+  validation  Json?    // Validation rules (min, max, pattern, etc.)
+  conditional Json?    // Conditional logic rules
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  responses   FormFieldResponse[]
+
+  @@index([formId])
+}
+
+enum FieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  EMAIL
+  NUMBER
+  PHONE
+  URL
+  DATE
+  TIME
+  MULTIPLE_CHOICE
+  CHECKBOXES
+  DROPDOWN
+  LINEAR_SCALE
+  FILE_UPLOAD
+  SECTION_HEADER
+}
+
+model FormResponse {
+  id              String              @id @default(cuid())
+  formId          String
+  form            Form                @relation(fields: [formId], references: [id], onDelete: Cascade)
+  fieldResponses  FormFieldResponse[]
+  submittedAt     DateTime            @default(now())
+  submitterEmail  String?
+  submitterIp     String?
+  metadata        Json?               // Browser info, device info, etc.
+
+  @@index([formId])
+  @@index([submittedAt])
+}
+
+model FormFieldResponse {
+  id         String       @id @default(cuid())
+  responseId String
+  response   FormResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  fieldId    String
+  field      FormField    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value      Json         // Flexible storage for any type of response
+  createdAt  DateTime     @default(now())
+
+  @@index([responseId])
+  @@index([fieldId])
+}

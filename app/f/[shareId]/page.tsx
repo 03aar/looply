@@ -1,0 +1,115 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
+import FormRenderer from "@/components/form-renderer/FormRenderer"
+import { type Form } from "@/types/form"
+import { motion } from "framer-motion"
+import { CheckCircle } from "lucide-react"
+
+export default function PublicFormPage() {
+  const params = useParams()
+  const router = useRouter()
+  const [form, setForm] = useState<Form | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+
+  useEffect(() => {
+    fetchForm()
+  }, [params.shareId])
+
+  const fetchForm = async () => {
+    try {
+      const response = await fetch(`/api/share/${params.shareId}`)
+      if (!response.ok) {
+        throw new Error("Form not found")
+      }
+      const data = await response.json()
+      setForm(data)
+    } catch (err) {
+      setError("This form could not be found or is no longer available.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async (responses: Record<string, any>) => {
+    try {
+      const fieldResponses = Object.entries(responses).map(([fieldId, value]) => ({
+        fieldId,
+        value,
+      }))
+
+      const response = await fetch("/api/responses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formId: form?.id,
+          fieldResponses,
+          submitterEmail: responses.email,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to submit response")
+      }
+
+      setSubmitted(true)
+    } catch (err) {
+      alert("Failed to submit form. Please try again.")
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading form...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !form) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">Form Not Found</h1>
+          <p className="text-gray-600 mb-8">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="mb-6"
+          >
+            <CheckCircle className="w-24 h-24 text-green-500 mx-auto" />
+          </motion.div>
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">Thank You!</h1>
+          <p className="text-gray-600 mb-8">
+            {form.settings?.confirmationMessage || "Your response has been recorded."}
+          </p>
+          <p className="text-sm text-gray-500">
+            Powered by <span className="font-semibold text-purple-600">looply</span>
+          </p>
+        </motion.div>
+      </div>
+    )
+  }
+
+  return <FormRenderer form={form} onSubmit={handleSubmit} />
+}
