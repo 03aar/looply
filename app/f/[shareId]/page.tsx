@@ -1,41 +1,47 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useState, useEffect, useCallback } from "react"
+import { useParams } from "next/navigation"
 import FormRenderer from "@/components/form-renderer/FormRenderer"
 import { type Form } from "@/types/form"
 import { motion } from "framer-motion"
-import { CheckCircle } from "lucide-react"
+import { CheckCircle, AlertCircle } from "lucide-react"
+import { LoadingPage } from "@/components/loading"
 
 export default function PublicFormPage() {
   const params = useParams()
-  const router = useRouter()
   const [form, setForm] = useState<Form | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    fetchForm()
-  }, [params.shareId])
-
-  const fetchForm = async () => {
+  const fetchForm = useCallback(async () => {
     try {
+      setLoading(true)
+      setError(null)
       const response = await fetch(`/api/share/${params.shareId}`)
+
       if (!response.ok) {
         throw new Error("Form not found")
       }
-      const data = await response.json()
-      setForm(data)
-    } catch (err) {
-      setError("This form could not be found or is no longer available.")
+
+      const result = await response.json()
+      setForm(result.data)
+    } catch (err: any) {
+      setError(err.message || "This form could not be found or is no longer available.")
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.shareId])
+
+  useEffect(() => {
+    fetchForm()
+  }, [fetchForm])
 
   const handleSubmit = async (responses: Record<string, any>) => {
     try {
+      setSubmitting(true)
       const fieldResponses = Object.entries(responses).map(([fieldId, value]) => ({
         fieldId,
         value,
@@ -52,30 +58,27 @@ export default function PublicFormPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to submit response")
+        const result = await response.json()
+        throw new Error(result.error || "Failed to submit response")
       }
 
       setSubmitted(true)
-    } catch (err) {
-      alert("Failed to submit form. Please try again.")
+    } catch (err: any) {
+      alert(err.message || "Failed to submit form. Please try again.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading form...</p>
-        </div>
-      </div>
-    )
+    return <LoadingPage message="Loading form..." />
   }
 
   if (error || !form) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
+          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h1 className="text-4xl font-bold text-gray-800 mb-4">Form Not Found</h1>
           <p className="text-gray-600 mb-8">{error}</p>
         </div>

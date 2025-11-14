@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { successResponse, errorResponse, notFoundError, serverError } from "@/lib/api-response"
 
 // GET a specific form
 export async function GET(
@@ -18,13 +19,13 @@ export async function GET(
     })
 
     if (!form) {
-      return NextResponse.json({ error: "Form not found" }, { status: 404 })
+      return notFoundError("Form")
     }
 
-    return NextResponse.json(form)
+    return successResponse(form)
   } catch (error) {
     console.error("Error fetching form:", error)
-    return NextResponse.json({ error: "Failed to fetch form" }, { status: 500 })
+    return serverError(error)
   }
 }
 
@@ -37,38 +38,53 @@ export async function PUT(
     const body = await request.json()
     const { title, description, fields, settings, isPublished } = body
 
+    if (title && (typeof title !== 'string' || title.trim().length === 0)) {
+      return errorResponse("Form title cannot be empty", 400)
+    }
+
+    // Check if form exists
+    const existingForm = await prisma.form.findUnique({
+      where: { id: params.formId },
+    })
+
+    if (!existingForm) {
+      return notFoundError("Form")
+    }
+
     // Update form basic info
-    const form = await prisma.form.update({
+    await prisma.form.update({
       where: { id: params.formId },
       data: {
-        title,
-        description,
-        isPublished,
+        ...(title && { title: title.trim() }),
+        ...(description !== undefined && { description: description?.trim() || null }),
+        ...(isPublished !== undefined && { isPublished }),
       },
     })
 
-    // Update or create fields
-    if (fields) {
+    // Update fields if provided
+    if (fields && Array.isArray(fields)) {
       // Delete existing fields
       await prisma.formField.deleteMany({
         where: { formId: params.formId },
       })
 
       // Create new fields
-      await prisma.formField.createMany({
-        data: fields.map((field: any, index: number) => ({
-          formId: params.formId,
-          type: field.type,
-          label: field.label,
-          description: field.description,
-          placeholder: field.placeholder,
-          required: field.required,
-          order: index,
-          options: field.options || undefined,
-          validation: field.validation || undefined,
-          conditional: field.conditional || undefined,
-        })),
-      })
+      if (fields.length > 0) {
+        await prisma.formField.createMany({
+          data: fields.map((field: any, index: number) => ({
+            formId: params.formId,
+            type: field.type,
+            label: field.label,
+            description: field.description || null,
+            placeholder: field.placeholder || null,
+            required: field.required ?? false,
+            order: index,
+            options: field.options ? JSON.parse(JSON.stringify(field.options)) : null,
+            validation: field.validation ? JSON.parse(JSON.stringify(field.validation)) : null,
+            conditional: field.conditional ? JSON.parse(JSON.stringify(field.conditional)) : null,
+          })),
+        })
+      }
     }
 
     // Update or create settings
@@ -77,9 +93,23 @@ export async function PUT(
         where: { formId: params.formId },
         create: {
           formId: params.formId,
-          ...settings,
+          allowMultipleSubmissions: settings.allowMultipleSubmissions ?? true,
+          requireLogin: settings.requireLogin ?? false,
+          showProgressBar: settings.showProgressBar ?? true,
+          customTheme: settings.customTheme ? JSON.parse(JSON.stringify(settings.customTheme)) : null,
+          confirmationMessage: settings.confirmationMessage || null,
+          redirectUrl: settings.redirectUrl || null,
+          collectEmail: settings.collectEmail ?? true,
         },
-        update: settings,
+        update: {
+          ...(settings.allowMultipleSubmissions !== undefined && { allowMultipleSubmissions: settings.allowMultipleSubmissions }),
+          ...(settings.requireLogin !== undefined && { requireLogin: settings.requireLogin }),
+          ...(settings.showProgressBar !== undefined && { showProgressBar: settings.showProgressBar }),
+          ...(settings.customTheme !== undefined && { customTheme: settings.customTheme ? JSON.parse(JSON.stringify(settings.customTheme)) : null }),
+          ...(settings.confirmationMessage !== undefined && { confirmationMessage: settings.confirmationMessage || null }),
+          ...(settings.redirectUrl !== undefined && { redirectUrl: settings.redirectUrl || null }),
+          ...(settings.collectEmail !== undefined && { collectEmail: settings.collectEmail }),
+        },
       })
     }
 
@@ -94,10 +124,10 @@ export async function PUT(
       },
     })
 
-    return NextResponse.json(updatedForm)
+    return successResponse(updatedForm)
   } catch (error) {
     console.error("Error updating form:", error)
-    return NextResponse.json({ error: "Failed to update form" }, { status: 500 })
+    return serverError(error)
   }
 }
 
@@ -107,13 +137,22 @@ export async function DELETE(
   { params }: { params: { formId: string } }
 ) {
   try {
+    // Check if form exists
+    const existingForm = await prisma.form.findUnique({
+      where: { id: params.formId },
+    })
+
+    if (!existingForm) {
+      return notFoundError("Form")
+    }
+
     await prisma.form.delete({
       where: { id: params.formId },
     })
 
-    return NextResponse.json({ success: true })
+    return successResponse({ deleted: true })
   } catch (error) {
     console.error("Error deleting form:", error)
-    return NextResponse.json({ error: "Failed to delete form" }, { status: 500 })
+    return serverError(error)
   }
 }

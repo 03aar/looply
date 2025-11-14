@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { successResponse, errorResponse, serverError } from "@/lib/api-response"
 
 // GET all forms for a user
 export async function GET(request: NextRequest) {
@@ -17,10 +18,10 @@ export async function GET(request: NextRequest) {
       orderBy: { updatedAt: "desc" },
     })
 
-    return NextResponse.json(forms)
+    return successResponse(forms)
   } catch (error) {
     console.error("Error fetching forms:", error)
-    return NextResponse.json({ error: "Failed to fetch forms" }, { status: 500 })
+    return serverError(error)
   }
 }
 
@@ -30,20 +31,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { title, description } = body
 
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return errorResponse("Form title is required", 400)
+    }
+
     // TODO: Get userId from session once auth is implemented
     const userId = "demo-user"
 
     const form = await prisma.form.create({
       data: {
-        title: title || "Untitled Form",
-        description,
+        title: title.trim(),
+        description: description?.trim() || null,
         userId,
       },
     })
 
-    return NextResponse.json(form, { status: 201 })
+    return successResponse(form, 201)
   } catch (error) {
     console.error("Error creating form:", error)
-    return NextResponse.json({ error: "Failed to create form" }, { status: 500 })
+    return serverError(error)
   }
 }

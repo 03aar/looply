@@ -1,33 +1,42 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Download, Eye } from "lucide-react"
+import { ArrowLeft, Download, Eye, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { formatDateTime } from "@/lib/utils"
+import { LoadingPage } from "@/components/loading"
 
 export default function ResponsesPage() {
   const params = useParams()
   const [responses, setResponses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchResponses()
-  }, [])
-
-  const fetchResponses = async () => {
+  const fetchResponses = useCallback(async () => {
     try {
+      setLoading(true)
+      setError(null)
       const response = await fetch(`/api/forms/${params.formId}/responses`)
-      const data = await response.json()
-      setResponses(data)
-    } catch (err) {
-      console.error("Failed to fetch responses:", err)
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch responses")
+      }
+
+      const result = await response.json()
+      setResponses(result.data || [])
+    } catch (err: any) {
+      setError(err.message || "Failed to load responses")
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.formId])
+
+  useEffect(() => {
+    fetchResponses()
+  }, [fetchResponses])
 
   const exportToCSV = () => {
     if (responses.length === 0) return
@@ -63,14 +72,7 @@ export default function ResponsesPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading responses...</p>
-        </div>
-      </div>
-    )
+    return <LoadingPage message="Loading responses..." />
   }
 
   return (
@@ -88,13 +90,24 @@ export default function ResponsesPage() {
               <p className="text-gray-600 mt-1">{responses.length} total responses</p>
             </div>
           </div>
-          <Button onClick={exportToCSV} className="gap-2">
+          <Button onClick={exportToCSV} disabled={responses.length === 0} className="gap-2">
             <Download className="w-4 h-4" />
             Export CSV
           </Button>
         </div>
 
-        {responses.length === 0 ? (
+        {error && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-2 text-red-700">
+                <AlertCircle className="w-5 h-5" />
+                <p>{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {responses.length === 0 && !error ? (
           <Card>
             <CardContent className="py-12 text-center">
               <Eye className="w-16 h-16 text-gray-300 mx-auto mb-4" />

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { successResponse, errorResponse, notFoundError, serverError } from "@/lib/api-response"
 
 // GET form by share ID (public endpoint)
 export async function GET(
@@ -18,16 +19,16 @@ export async function GET(
     })
 
     if (!form) {
-      return NextResponse.json({ error: "Form not found" }, { status: 404 })
+      return notFoundError("Form")
     }
 
     if (!form.isPublished) {
-      return NextResponse.json({ error: "Form is not published" }, { status: 403 })
+      return errorResponse("This form is not currently accepting responses", 403)
     }
 
-    return NextResponse.json(form)
+    return successResponse(form)
   } catch (error) {
     console.error("Error fetching form:", error)
-    return NextResponse.json({ error: "Failed to fetch form" }, { status: 500 })
+    return serverError(error)
   }
 }

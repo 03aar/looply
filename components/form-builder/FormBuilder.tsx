@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { FieldType, type FormField } from "@/types/form"
@@ -8,8 +8,12 @@ import FieldSelector from "./FieldSelector"
 import FieldEditor from "./FieldEditor"
 import { GripVertical, Trash2 } from "lucide-react"
 
-export default function FormBuilder() {
-  const [fields, setFields] = useState<FormField[]>([])
+interface FormBuilderProps {
+  fields: FormField[]
+  onFieldsChange: (fields: FormField[]) => void
+}
+
+export default function FormBuilder({ fields, onFieldsChange }: FormBuilderProps) {
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
 
   const addField = (type: FieldType) => {
@@ -28,18 +32,21 @@ export default function FormBuilder() {
           ]
         : undefined,
     }
-    setFields([...fields, newField])
+    const updatedFields = [...fields, newField]
+    onFieldsChange(updatedFields)
     setSelectedFieldId(newField.id)
   }
 
   const updateField = (id: string, updates: Partial<FormField>) => {
-    setFields(fields.map(field =>
+    const updatedFields = fields.map(field =>
       field.id === id ? { ...field, ...updates } : field
-    ))
+    )
+    onFieldsChange(updatedFields)
   }
 
   const deleteField = (id: string) => {
-    setFields(fields.filter(field => field.id !== id))
+    const updatedFields = fields.filter(field => field.id !== id)
+    onFieldsChange(updatedFields)
     if (selectedFieldId === id) {
       setSelectedFieldId(null)
     }
@@ -80,7 +87,7 @@ export default function FormBuilder() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {fields.map((field, index) => (
+            {fields.map((field) => (
               <Card
                 key={field.id}
                 className={`cursor-pointer transition-all hover:shadow-md ${

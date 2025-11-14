@@ -1,19 +1,85 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import FormBuilder from "@/components/form-builder/FormBuilder"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Save, Eye } from "lucide-react"
+import { ArrowLeft, Save, Eye, Loader2 } from "lucide-react"
 import Link from "next/link"
+import type { FormField } from "@/types/form"
 
 export default function NewFormPage() {
   const router = useRouter()
   const [formTitle, setFormTitle] = useState("Untitled Form")
   const [formDescription, setFormDescription] = useState("")
+  const [fields, setFields] = useState<FormField[]>([])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleFieldsChange = useCallback((updatedFields: FormField[]) => {
+    setFields(updatedFields)
+  }, [])
+
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      setError(null)
+
+      if (!formTitle.trim()) {
+        setError("Form title is required")
+        return
+      }
+
+      if (fields.length === 0) {
+        setError("Please add at least one field to your form")
+        return
+      }
+
+      // Create form
+      const createResponse = await fetch("/api/forms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formTitle,
+          description: formDescription,
+        }),
+      })
+
+      if (!createResponse.ok) {
+        const error = await createResponse.json()
+        throw new Error(error.error || "Failed to create form")
+      }
+
+      const { data: form } = await createResponse.json()
+
+      // Update form with fields
+      const updateResponse = await fetch(`/api/forms/${form.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formTitle,
+          description: formDescription,
+          fields: fields,
+        }),
+      })
+
+      if (!updateResponse.ok) {
+        const error = await updateResponse.json()
+        throw new Error(error.error || "Failed to save form")
+      }
+
+      // Redirect to dashboard
+      router.push("/dashboard")
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || "Failed to save form")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
@@ -32,16 +98,30 @@ export default function NewFormPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="gap-2">
-                <Eye className="w-4 h-4" />
-                Preview
-              </Button>
-              <Button className="gap-2">
-                <Save className="w-4 h-4" />
-                Save Form
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="gap-2"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Form
+                  </>
+                )}
               </Button>
             </div>
           </div>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
         </div>
       </div>
 
@@ -73,7 +153,7 @@ export default function NewFormPage() {
             </CardContent>
           </Card>
 
-          <FormBuilder />
+          <FormBuilder fields={fields} onFieldsChange={handleFieldsChange} />
         </div>
       </div>
     </div>

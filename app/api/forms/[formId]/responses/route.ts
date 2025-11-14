@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { successResponse, notFoundError, serverError } from "@/lib/api-response"
 
 // GET all responses for a form
 export async function GET(
@@ -7,6 +8,15 @@ export async function GET(
   { params }: { params: { formId: string } }
 ) {
   try {
+    // Check if form exists
+    const form = await prisma.form.findUnique({
+      where: { id: params.formId },
+    })
+
+    if (!form) {
+      return notFoundError("Form")
+    }
+
     const responses = await prisma.formResponse.findMany({
       where: { formId: params.formId },
       include: {
@@ -19,9 +29,9 @@ export async function GET(
       orderBy: { submittedAt: "desc" },
     })
 
-    return NextResponse.json(responses)
+    return successResponse(responses)
   } catch (error) {
     console.error("Error fetching responses:", error)
-    return NextResponse.json({ error: "Failed to fetch responses" }, { status: 500 })
+    return serverError(error)
   }
 }

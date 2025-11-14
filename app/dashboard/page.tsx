@@ -1,30 +1,83 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { PlusCircle, FileText, Eye, Copy, Trash2 } from "lucide-react"
+import { PlusCircle, FileText, Eye, Copy, Trash2, Share2, AlertCircle } from "lucide-react"
+import { LoadingPage } from "@/components/loading"
+import { formatDateTime } from "@/lib/utils"
+
+interface Form {
+  id: string
+  title: string
+  description: string | null
+  isPublished: boolean
+  shareId: string
+  createdAt: string
+  _count?: {
+    responses: number
+  }
+}
 
 export default function Dashboard() {
-  const [forms, setForms] = useState([
-    {
-      id: "1",
-      title: "Sample Contact Form",
-      description: "Get in touch with us",
-      responses: 24,
-      isPublished: true,
-      createdAt: new Date(),
-    },
-    {
-      id: "2",
-      title: "Event Registration",
-      description: "Register for our upcoming event",
-      responses: 156,
-      isPublished: true,
-      createdAt: new Date(),
-    },
-  ])
+  const [forms, setForms] = useState<Form[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchForms = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch("/api/forms")
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch forms")
+      }
+
+      const result = await response.json()
+      setForms(result.data || [])
+    } catch (err: any) {
+      setError(err.message || "Failed to load forms")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchForms()
+  }, [fetchForms])
+
+  const handleDelete = async (formId: string) => {
+    if (!confirm("Are you sure you want to delete this form? This action cannot be undone.")) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/forms/${formId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete form")
+      }
+
+      // Refresh the forms list
+      fetchForms()
+    } catch (err: any) {
+      alert(err.message || "Failed to delete form")
+    }
+  }
+
+  const handleCopyLink = (shareId: string) => {
+    const link = `${window.location.origin}/f/${shareId}`
+    navigator.clipboard.writeText(link)
+    alert("Form link copied to clipboard!")
+  }
+
+  if (loading) {
+    return <LoadingPage message="Loading your forms..." />
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
@@ -44,6 +97,17 @@ export default function Dashboard() {
           </Link>
         </div>
 
+        {error && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-2 text-red-700">
+                <AlertCircle className="w-5 h-5" />
+                <p>{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {forms.map((form) => (
             <Card key={form.id} className="group hover:shadow-xl transition-all animate-slide-up">
@@ -51,11 +115,15 @@ export default function Dashboard() {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle className="text-xl mb-2">{form.title}</CardTitle>
-                    <CardDescription>{form.description}</CardDescription>
+                    <CardDescription>{form.description || "No description"}</CardDescription>
                   </div>
-                  {form.isPublished && (
-                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                  {form.isPublished ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full whitespace-nowrap">
                       Published
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full whitespace-nowrap">
+                      Draft
                     </span>
                   )}
                 </div>
@@ -63,23 +131,31 @@ export default function Dashboard() {
               <CardContent>
                 <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
                   <FileText className="w-4 h-4" />
-                  <span>{form.responses} responses</span>
+                  <span>{form._count?.responses || 0} responses</span>
                 </div>
-                <div className="flex gap-2">
-                  <Link href={`/dashboard/forms/${form.id}/edit`} className="flex-1">
-                    <Button variant="outline" className="w-full">
-                      Edit
-                    </Button>
-                  </Link>
-                  <Link href={`/dashboard/forms/${form.id}/responses`}>
-                    <Button variant="ghost" size="icon">
+                <div className="flex gap-2 flex-wrap">
+                  <Link href={`/dashboard/forms/${form.id}/responses`} className="flex-1">
+                    <Button variant="ghost" size="sm" className="w-full gap-1">
                       <Eye className="w-4 h-4" />
+                      View
                     </Button>
                   </Link>
-                  <Button variant="ghost" size="icon">
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon">
+                  {form.isPublished && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopyLink(form.shareId)}
+                      title="Copy form link"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(form.id)}
+                    title="Delete form"
+                  >
                     <Trash2 className="w-4 h-4 text-red-500" />
                   </Button>
                 </div>
@@ -87,7 +163,7 @@ export default function Dashboard() {
             </Card>
           ))}
 
-          {/* Empty state or create new card */}
+          {/* Create new card */}
           <Link href="/dashboard/forms/new">
             <Card className="border-dashed border-2 hover:border-purple-400 hover:bg-purple-50/50 transition-all cursor-pointer h-full min-h-[200px] flex items-center justify-center">
               <CardContent className="text-center">
@@ -98,6 +174,20 @@ export default function Dashboard() {
             </Card>
           </Link>
         </div>
+
+        {forms.length === 0 && !error && (
+          <div className="text-center py-12">
+            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No forms yet</h3>
+            <p className="text-gray-500 mb-6">Create your first form to get started</p>
+            <Link href="/dashboard/forms/new">
+              <Button className="gap-2">
+                <PlusCircle className="w-5 h-5" />
+                Create Your First Form
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )
