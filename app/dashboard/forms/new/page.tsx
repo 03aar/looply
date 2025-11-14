@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Save, Eye, Loader2 } from "lucide-react"
+import { ArrowLeft, Save, Send, Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import type { FormField } from "@/types/form"
 
@@ -17,16 +17,21 @@ export default function NewFormPage() {
   const [formDescription, setFormDescription] = useState("")
   const [fields, setFields] = useState<FormField[]>([])
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [savedFormId, setSavedFormId] = useState<string | null>(null)
 
   const handleFieldsChange = useCallback((updatedFields: FormField[]) => {
     setFields(updatedFields)
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (shouldPublish = false) => {
     try {
       setSaving(true)
+      setPublishing(shouldPublish)
       setError(null)
+      setSuccess(null)
 
       if (!formTitle.trim()) {
         setError("Form title is required")
@@ -38,25 +43,31 @@ export default function NewFormPage() {
         return
       }
 
-      // Create form
-      const createResponse = await fetch("/api/forms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: formTitle,
-          description: formDescription,
-        }),
-      })
+      let formId = savedFormId
 
-      if (!createResponse.ok) {
-        const error = await createResponse.json()
-        throw new Error(error.error || "Failed to create form")
+      if (!formId) {
+        // Create form
+        const createResponse = await fetch("/api/forms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: formTitle,
+            description: formDescription,
+          }),
+        })
+
+        if (!createResponse.ok) {
+          const error = await createResponse.json()
+          throw new Error(error.error || "Failed to create form")
+        }
+
+        const { data: form } = await createResponse.json()
+        formId = form.id
+        setSavedFormId(formId)
       }
 
-      const { data: form } = await createResponse.json()
-
       // Update form with fields
-      const updateResponse = await fetch(`/api/forms/${form.id}`, {
+      const updateResponse = await fetch(`/api/forms/${formId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -71,13 +82,33 @@ export default function NewFormPage() {
         throw new Error(error.error || "Failed to save form")
       }
 
-      // Redirect to dashboard
-      router.push("/dashboard")
-      router.refresh()
+      // Publish if requested
+      if (shouldPublish) {
+        const publishResponse = await fetch(`/api/forms/${formId}/publish`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPublished: true }),
+        })
+
+        if (!publishResponse.ok) {
+          const error = await publishResponse.json()
+          throw new Error(error.error || "Failed to publish form")
+        }
+
+        setSuccess("Form published successfully! Redirecting to dashboard...")
+        setTimeout(() => {
+          router.push("/dashboard")
+          router.refresh()
+        }, 2000)
+      } else {
+        setSuccess("Form saved as draft!")
+        setTimeout(() => setSuccess(null), 3000)
+      }
     } catch (err: any) {
       setError(err.message || "Failed to save form")
     } finally {
       setSaving(false)
+      setPublishing(false)
     }
   }
 
@@ -99,11 +130,12 @@ export default function NewFormPage() {
             </div>
             <div className="flex gap-2">
               <Button
-                onClick={handleSave}
-                disabled={saving}
+                onClick={() => handleSave(false)}
+                disabled={saving || publishing}
+                variant="outline"
                 className="gap-2"
               >
-                {saving ? (
+                {saving && !publishing ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Saving...
@@ -111,15 +143,39 @@ export default function NewFormPage() {
                 ) : (
                   <>
                     <Save className="w-4 h-4" />
-                    Save Form
+                    Save Draft
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => handleSave(true)}
+                disabled={saving || publishing}
+                className="gap-2 bg-green-600 hover:bg-green-700"
+              >
+                {publishing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Publish Form
                   </>
                 )}
               </Button>
             </div>
           </div>
           {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-start gap-2">
+              <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{success}</span>
             </div>
           )}
         </div>
