@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { PlusCircle, FileText, Eye, Copy, Trash2, Share2, AlertCircle } from "lucide-react"
+import { PlusCircle, FileText, Eye, Copy, Trash2, Share2, AlertCircle, Star } from "lucide-react"
 import { LoadingPage } from "@/components/loading"
 import { formatDateTime } from "@/lib/utils"
 
@@ -82,19 +82,27 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
               My Forms
             </h1>
             <p className="text-gray-600 mt-2">Create and manage your beautiful forms</p>
           </div>
-          <Link href="/dashboard/forms/new">
-            <Button className="gap-2">
-              <PlusCircle className="w-5 h-5" />
-              Create New Form
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/templates">
+              <Button variant="outline" className="gap-2">
+                <FileText className="w-5 h-5" />
+                Browse Templates
+              </Button>
+            </Link>
+            <Link href="/dashboard/forms/new">
+              <Button className="gap-2">
+                <PlusCircle className="w-5 h-5" />
+                Create New Form
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {error && (
@@ -177,15 +185,36 @@ export default function Dashboard() {
 
         {forms.length === 0 && !error && (
           <div className="text-center py-12">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No forms yet</h3>
-            <p className="text-gray-500 mb-6">Create your first form to get started</p>
-            <Link href="/dashboard/forms/new">
-              <Button className="gap-2">
-                <PlusCircle className="w-5 h-5" />
-                Create Your First Form
-              </Button>
-            </Link>
+            <div className="max-w-md mx-auto">
+              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-2xl font-semibold text-gray-700 mb-2">Welcome to Looply!</h3>
+              <p className="text-gray-500 mb-6">
+                Create your first form in just 2 minutes. Choose a template to get started quickly.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link href="/templates">
+                  <Button size="lg" className="gap-2">
+                    <Star className="w-5 h-5" />
+                    Browse Templates
+                  </Button>
+                </Link>
+                <Link href="/dashboard/forms/new">
+                  <Button size="lg" variant="outline" className="gap-2">
+                    <PlusCircle className="w-5 h-5" />
+                    Start from Scratch
+                  </Button>
+                </Link>
+              </div>
+              <div className="mt-8 p-4 bg-purple-50 rounded-lg">
+                <h4 className="font-semibold text-purple-900 mb-2">Quick Tips:</h4>
+                <ul className="text-sm text-purple-700 space-y-1 text-left">
+                  <li>• Use templates to save time</li>
+                  <li>• Drag fields to reorder them</li>
+                  <li>• Mark important fields as required</li>
+                  <li>• Share your form link to collect responses</li>
+                </ul>
+              </div>
+            </div>
           </div>
         )}
       </div>
